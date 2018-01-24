@@ -58,7 +58,6 @@ module.exports = NodeHelper.create({
       }
 
       // Parse the ARP-SCAN table response
-
       const [ , , ...rows] = buffer.split('\n');
       rows.forEach(row => {
         const cells = row.split('\t').filter(String);
@@ -90,8 +89,8 @@ module.exports = NodeHelper.create({
 
     this.log(`${this.name} is scanning for ip addresses`, this.config.devices);
 
-    var discoveredDevices = [];
-    var self = this;
+    const discoveredDevices = [];
+
     this.config.devices.forEach(device => {
       this.log("Checking Device...");
 
@@ -108,20 +107,19 @@ module.exports = NodeHelper.create({
       }
     });
 
-    this.log(`${self.name} ping results: `, discoveredDevices);
+    this.log(`${this.name} ping results: `, discoveredDevices);
   },
 
   findDeviceByMacAddress: function (macAddress) {
     // Find first device with matching macAddress
-    for (var i = 0; i < this.config.devices.length; i++) {
-      var device = this.config.devices[i];
-      if (device.hasOwnProperty("macAddress")) {
-        if (macAddress.toUpperCase() === device.macAddress.toUpperCase()){
-          this.log(`${this.name} found device by MAC Address`, device);
-          return device;
-        }
+    this.config.devices.forEach(device => {
+      const { macAddress:thisMacAddress = '' } = device;
+      if (thisMacAddress.toUpperCase() === macAddress.toUpperCase()) {
+        this.log(`${this.name} found device by MAC Address`, device);
+        return device;
       }
-    }
+    });
+
     // Return macAddress (if showing unknown) or null
     if (this.config.showUnknown) {
       return {
@@ -130,19 +128,16 @@ module.exports = NodeHelper.create({
         icon: "question",
         type: "Unknown"
       };
-    } else {
-      return null;
     }
+
+    return null;
   },
 
   log: function(message, object) {
     // Log if config is missing or in debug mode
     if (!this.config || this.config.debug) {
-      if (object) {
-        console.log(message, object);
-      } else {
-        console.log(message);
-      }
+      if (object) { console.log(message, object); }
+      else { console.log(message); }
     }
   },
 
