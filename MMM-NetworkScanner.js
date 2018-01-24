@@ -89,8 +89,8 @@ Module.register("MMM-NetworkScanner", {
     this.log(`${this.name} received a notification ${notification} ${payload}`);
 
     var self = this;
-    const getKeyedDevices = (devices, key) => devices.reduce(
-      (acc, device) => ({ ...acc, [device[key]]: device }),
+    const getKeyedDevices = (devices = [], key) => devices.reduce(
+      (acc, device) => (Object.assign(acc, { [device[key]]: device })),
       {}
     );
 
@@ -107,39 +107,36 @@ Module.register("MMM-NetworkScanner", {
     }
 
     if (notification === 'MAC_ADDRESSES') {
-      if (this.config.debug) Log.info(this.name + " MAC_ADDRESSES payload: ", payload);
+      this.log(`${this.name} MAC_ADDRESSES payload: ${payload}`);
 
-      this.networkDevices = payload;
+      let nextState = [ ...payload ];
 
-      // Update device info
-      for (var i = 0; i < this.networkDevices.length; i++) {
-        var device = this.networkDevices[i];
-        // Set last seen
-        if (device.online) {
-          device.lastSeen = moment();
-        }
-        // Keep alive?
-        device.online = (moment().diff(device.lastSeen, 'seconds') < this.config.keepAlive);
-      }
+      nextState.forEach(device => { device.lastSeen = moment(); });
 
-      // Add offline devices from config
       if (this.config.showOffline) {
-        for (var d = 0; d < this.config.devices.length; d++) {
-          var device = this.config.devices[d];
+        const networkDevicesByName = getKeyedDevices(this.networkDevices, 'name');
+        const payloadDevicesByName = getKeyedDevices(nextState, 'name');
 
-          for(var n = 0; n < this.networkDevices.length; n++){
-            if( device.macAddress && this.networkDevices[n].macAddress && this.networkDevices[n].macAddress.toUpperCase() === device.macAddress.toUpperCase()) {
-              n = -1;
-              break;
-            }
-          }
+        nextState = this.config.devices.map(device => {
+          const oldDeviceState = networkDevicesByName[device.name];
+          const payloadDeviceState = payloadDevicesByName[device.name];
+          const newDeviceState = payloadDeviceState
+            ? payloadDeviceState
+            : (oldDeviceState || device);
 
-          if (n != -1) {
-            device.online = false;
-            this.networkDevices.push(device);
-          }
-        }
+          const sinceLastSeen = newDeviceState.lastSeen
+            ? moment().diff(newDeviceState.lastSeen, 'seconds')
+            : null;
+
+          newDeviceState.online = (sinceLastSeen != null)
+            ? (sinceLastSeen < this.config.keepAlive)
+            : false;
+
+          return newDeviceState;
+        });
       }
+
+      this.networkDevices = nextState;
 
       // Sort list by known device names, then unknown device mac addresses
       this.networkDevices.sort(function (a, b) {
@@ -223,7 +220,7 @@ Module.register("MMM-NetworkScanner", {
         if (this.config.showLastSeen && device.lastSeen) {
            deviceItem.innerHTML +=
              `&nbsp;<small class="dimmed">
-               ("${device.lastSeen.fromNow()}")
+               (${device.lastSeen.fromNow()})
              </small>`;
         }
 

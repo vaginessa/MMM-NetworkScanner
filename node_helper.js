@@ -37,25 +37,25 @@ module.exports = NodeHelper.create({
   scanNetworkMAC: function() {
     this.log(`${this.name} is performing arp-scan`);
 
-    var self = this;
     // Target hosts/network supplied in config or entire localnet
-    var arpHosts = (this.config.network || '-l');
-    var arp = sudo(['arp-scan', '-q', arpHosts]);
-    var buffer = '';
-    var errstream = '';
-    var discoveredMacAddresses = [];
-    var discoveredDevices = [];
+    const arpHosts = (this.config.network || '-l');
+    const arp = sudo(['arp-scan', '-q', arpHosts]);
+    const discoveredMacAddresses = [];
+    const discoveredDevices = [];
 
+    let buffer = '';
+    let errstream = '';
+    
 		arp.stdout.on('data', data => { buffer += data; });
 		arp.stderr.on('data', data => { errstream += data; });
 		arp.on('error', err => { errstream += err; });
 
     arp.on('close', code => {
       if (code !== 0) {
-				this.log(
-					`${this.name} received an error running arp-scan: ${code}:\n
-					 ${errstream}`
-				);
+          this.log(
+            `${this.name} received an error running arp-scan: ${code}:\n
+             ${errstream}`
+          );
         return;
       }
 
