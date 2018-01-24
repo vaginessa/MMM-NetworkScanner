@@ -14,24 +14,22 @@ const sudo = require("sudo");
 module.exports = NodeHelper.create({
 
   start: function() {
-    this.log("Starting module: " + this.name);
+    this.log(`Starting module: ${this.name}`);
   },
 
   // Override socketNotificationReceived method.
   socketNotificationReceived: function(notification, payload) {
-		this.log(`${this.name} received ${notification}`);
+    this.log(`${this.name} received ${notification}`);
 
-    if (notification === "CONFIG") {
-      this.config = payload;
-      return true;
+    switch (notification) {
+      case 'CONFIG':
+        this.config = payload;
+        return true;
+      case 'SCAN_NETWORK':
+        this.scanNetworkMAC();
+        this.scanNetworkIP();
+        return true;
     }
-
-    if (notification === "SCAN_NETWORK") {
-      this.scanNetworkMAC();
-      this.scanNetworkIP();
-      return true;
-    }
-
   },
 
   scanNetworkMAC: function() {
@@ -45,41 +43,40 @@ module.exports = NodeHelper.create({
 
     let buffer = '';
     let errstream = '';
-    
-		arp.stdout.on('data', data => { buffer += data; });
-		arp.stderr.on('data', data => { errstream += data; });
-		arp.on('error', err => { errstream += err; });
+
+    arp.stdout.on('data', data => { buffer += data; });
+    arp.stderr.on('data', data => { errstream += data; });
+    arp.on('error', err => { errstream += err; });
 
     arp.on('close', code => {
       if (code !== 0) {
           this.log(
-            `${this.name} received an error running arp-scan: ${code}:\n
-             ${errstream}`
+            `${this.name} received an error running arp-scan: ${code}:`,
+             errstream
           );
         return;
       }
 
       // Parse the ARP-SCAN table response
-      const rows = buffer.split('\n');
-      for (var i = 2; i < rows.length; i++) {
-        const cells = rows[i].split('\t').filter(String);
 
-        // Update device status
-        if (cells && cells[1]) {
-          const macAddress = cells[1].toUpperCase();
-          if (macAddress && discoveredMacAddresses.indexOf(macAddress) === -1) {
-            discoveredMacAddresses.push(macAddress);
-            const device = this.findDeviceByMacAddress(macAddress);
-            if (device) {
-              device.online = true;
-              discoveredDevices.push(device);
-            }
+      const [ , , ...rows] = buffer.split('\n');
+      rows.forEach(row => {
+        const cells = row.split('\t').filter(String);
+        const [ , macAddress = ''] = cells;
+        const upperMac = macAddress.toUpperCase();
+
+        if (discoveredMacAddresses.indexOf(upperMac) < 0) {
+          discoveredMacAddresses.push(upperMac);
+          const device = this.findDeviceByMacAddress(upperMac);
+          if (device) {
+            device.online = true;
+            discoveredDevices.push(device);
           }
         }
-      }
+      });
 
-			this.log(`${this.name} arp scan addresses: ${discoveredMacAddresses}`);
-			this.log(`${this.name} arp scan devices: ${discoveredDevices}`);
+      this.log(`${this.name} arp scan addresses:`, discoveredMacAddresses);
+      this.log(`${this.name} arp scan devices:`, discoveredDevices);
 
       this.sendSocketNotification("MAC_ADDRESSES", discoveredDevices);
     });
@@ -91,7 +88,7 @@ module.exports = NodeHelper.create({
       return;
     }
 
-		this.log(`${this.name} is scanning for ip addresses`, this.config.devices);
+    this.log(`${this.name} is scanning for ip addresses`, this.config.devices);
 
     var discoveredDevices = [];
     var self = this;
@@ -111,7 +108,7 @@ module.exports = NodeHelper.create({
       }
     });
 
-    this.log(self.name + " ping results: ", discoveredDevices);
+    this.log(`${self.name} ping results: `, discoveredDevices);
   },
 
   findDeviceByMacAddress: function (macAddress) {
@@ -120,7 +117,7 @@ module.exports = NodeHelper.create({
       var device = this.config.devices[i];
       if (device.hasOwnProperty("macAddress")) {
         if (macAddress.toUpperCase() === device.macAddress.toUpperCase()){
-          this.log(this.name + " found device by MAC Address", device);
+          this.log(`${this.name} found device by MAC Address`, device);
           return device;
         }
       }
@@ -128,11 +125,11 @@ module.exports = NodeHelper.create({
     // Return macAddress (if showing unknown) or null
     if (this.config.showUnknown) {
       return {
-				macAddress: macAddress,
-				name: macAddress,
-				icon: "question",
-				type: "Unknown"
-			};
+        macAddress: macAddress,
+        name: macAddress,
+        icon: "question",
+        type: "Unknown"
+      };
     } else {
       return null;
     }

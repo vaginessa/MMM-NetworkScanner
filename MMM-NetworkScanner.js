@@ -28,7 +28,7 @@ Module.register("MMM-NetworkScanner", {
     /* show devices in config even when offline */
     showOffline: true,
 
-    /* show when device was lat seen */
+    /* show when device was last seen */
     showLastSeen: false,
 
     /* length a device can be 'alive' since last found */
